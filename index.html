@@ -1,0 +1,1884 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F5775">
+<title>釣果ログ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+  /* === DESIGN TOKENS ===
+     Layout: single column, sticky header, FAB. Journal-like treatment:
+     warm paper on light, deep sea night on dark.
+     Shippori Mincho for titles/dates/numerals; Noto Sans JP for body. */
+  :root {
+    --bg: #F3EDDF;
+    --surface: #FDF9EF;
+    --surface-2: #E8DEC6;
+    --fg: #121A26;
+    --muted: #5A6678;
+    --faint: #8C96A6;
+    --border: #D4C9AF;
+    --border-strong: #B6A985;
+    --accent: #0F5775;
+    --accent-2: #2A7AA0;
+    --accent-fg: #FDF9EF;
+    --warn: #B74A2A;
+    --ok: #3F7F4A;
+    --shadow: 0 1px 2px rgba(0,0,0,0.03), 0 4px 10px rgba(0,0,0,0.04);
+
+    --f-display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    --f-ui: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --f-num: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 16px;
+
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1522;
+      --surface: #132032;
+      --surface-2: #1C2B40;
+      --fg: #EDE5D1;
+      --muted: #99A5B9;
+      --faint: #6B7A90;
+      --border: #273852;
+      --border-strong: #3B526E;
+      --accent: #5BA5CA;
+      --accent-2: #3B88AF;
+      --accent-fg: #0B1522;
+      --warn: #D97A5A;
+      --ok: #7FBB8A;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 10px rgba(0,0,0,0.25);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1522;
+    --surface: #132032;
+    --surface-2: #1C2B40;
+    --fg: #EDE5D1;
+    --muted: #99A5B9;
+    --faint: #6B7A90;
+    --border: #273852;
+    --border-strong: #3B526E;
+    --accent: #5BA5CA;
+    --accent-2: #3B88AF;
+    --accent-fg: #0B1522;
+    --warn: #D97A5A;
+    --ok: #7FBB8A;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 10px rgba(0,0,0,0.25);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--fg); }
+  body {
+    margin: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+    font-family: var(--f-ui);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0 0 auto;
+    height: env(safe-area-inset-top, 0px);
+    z-index: 15;
+    background: var(--bg);
+  }
+  .app { max-width: 560px; margin: 0 auto; }
+
+  /* App bar */
+  .appbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    background: var(--bg);
+    z-index: 10;
+    padding-block: 12px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .appbar h1 {
+    font-family: var(--f-display);
+    font-size: 22px; font-weight: 600; letter-spacing: 0.02em;
+    margin: 0; min-width: 0;
+    text-wrap: balance;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  .appbar h1 .count {
+    font-family: var(--f-num); font-weight: 500;
+    color: var(--muted); font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .appbar .right { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+
+  /* Buttons */
+  button, .btn {
+    font-family: var(--f-ui); font-size: 14px;
+    background: var(--surface); color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 9px 14px;
+    cursor: pointer;
+    min-height: 40px;
+    transition: background .12s, border-color .12s, transform .08s;
+  }
+  button:hover { background: var(--surface-2); }
+  button:active { transform: scale(.98); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+    font-weight: 700;
+  }
+  .btn-primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+  .btn-ghost { background: transparent; border-color: transparent; padding: 6px 10px; }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .btn-icon {
+    width: 40px; min-width: 40px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn-danger { color: var(--warn); border-color: var(--border); background: var(--surface); }
+  .btn-danger:hover { background: color-mix(in oklab, var(--warn) 10%, var(--surface)); }
+
+  /* Views */
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Log list */
+  .list {
+    display: flex; flex-direction: column; gap: 12px;
+    padding-block: 14px 100px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    display: flex;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .12s;
+    box-shadow: var(--shadow);
+  }
+  .card:active { transform: scale(.995); }
+  .card .thumb {
+    width: 108px; min-width: 108px; aspect-ratio: 1;
+    background: var(--surface-2);
+    background-size: cover; background-position: center;
+    position: relative;
+  }
+  .card .thumb.no-photo {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--faint);
+    font-family: var(--f-display); font-size: 32px; font-weight: 500;
+  }
+  .card .body {
+    padding: 10px 12px; min-width: 0; flex: 1;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .card .species {
+    font-family: var(--f-display); font-size: 17px; font-weight: 600;
+    color: var(--fg); line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card .stats {
+    font-family: var(--f-num);
+    color: var(--fg); font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .card .place {
+    font-size: 12px; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .card .meta {
+    margin-top: auto;
+    font-size: 11px; color: var(--muted);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    font-family: var(--f-num);
+    font-variant-numeric: tabular-nums;
+  }
+  .card .meta .dot { color: var(--border-strong); }
+
+  /* Empty state */
+  .empty {
+    padding: 56px 24px; text-align: center;
+    color: var(--muted);
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .empty h2 {
+    font-family: var(--f-display); font-size: 20px; margin: 0;
+    color: var(--fg); font-weight: 600;
+  }
+  .empty p { margin: 0; max-width: 32ch; font-size: 14px; }
+
+  /* FAB */
+  .fab {
+    position: fixed;
+    right: max(20px, env(safe-area-inset-right, 0px));
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 58px; height: 58px; min-height: 58px;
+    border-radius: 50%;
+    background: var(--accent); color: var(--accent-fg);
+    border: none;
+    box-shadow: 0 4px 16px rgba(15, 87, 117, 0.4);
+    font-size: 28px; line-height: 1; font-weight: 400;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20;
+    padding: 0;
+  }
+  .fab:hover { background: var(--accent-2); }
+
+  /* Form */
+  .form {
+    padding-block: 14px 120px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 14px 14px;
+    box-shadow: var(--shadow);
+  }
+  .section h3 {
+    font-family: var(--f-display);
+    font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+    margin: 0 0 12px 0;
+    color: var(--muted); text-transform: uppercase;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    font-size: 12px; color: var(--muted); font-weight: 500;
+    letter-spacing: 0.02em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .field input, .field select, .field textarea {
+    font-family: var(--f-ui);
+    font-size: 16px; color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+    width: 100%; min-width: 0;
+    min-height: 44px;
+  }
+  .field textarea {
+    min-height: 80px; resize: vertical;
+    font-family: var(--f-ui); line-height: 1.5;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent);
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  @media (max-width: 380px) {
+    .row-3 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* Photo picker */
+  .photo-pick {
+    aspect-ratio: 4 / 3; width: 100%;
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--r-lg);
+    background: var(--surface-2);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; color: var(--muted);
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    text-align: center;
+    padding: 16px;
+  }
+  .photo-pick.has-image {
+    border-style: solid;
+    padding: 0;
+    background-size: cover; background-position: center;
+  }
+  .photo-pick .plus {
+    font-size: 48px; line-height: 1;
+    color: var(--border-strong);
+    font-family: var(--f-display); font-weight: 300;
+  }
+  .photo-pick .label { font-size: 14px; font-weight: 500; }
+  .photo-pick .hint { font-size: 11px; color: var(--faint); }
+  .photo-pick input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  }
+  .photo-pick .change-hint {
+    position: absolute; bottom: 10px; right: 10px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 11px; padding: 4px 10px; border-radius: 999px;
+    font-weight: 500; pointer-events: none;
+  }
+
+  /* Auto badges */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-family: var(--f-ui); font-weight: 600;
+    padding: 2px 7px; border-radius: 10px;
+    background: var(--surface-2); color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .badge.ok { color: var(--ok); background: color-mix(in oklab, var(--ok) 12%, var(--surface-2)); }
+  .badge.warn { color: var(--warn); background: color-mix(in oklab, var(--warn) 12%, var(--surface-2)); }
+  .badge.loading { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Detail */
+  .detail {
+    padding-block: 14px 100px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .detail .photo {
+    aspect-ratio: 4 / 3;
+    background: var(--surface-2);
+    background-size: cover; background-position: center;
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .detail .photo.no-photo {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--faint);
+    font-size: 56px;
+    font-family: var(--f-display); font-weight: 300;
+  }
+  .detail h2 {
+    font-family: var(--f-display); font-size: 28px; font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+  .detail .date-line {
+    color: var(--muted); font-size: 13px;
+    font-family: var(--f-num); font-variant-numeric: tabular-nums;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+  .detail .big-stat {
+    font-family: var(--f-display);
+    display: flex; gap: 24px; flex-wrap: wrap;
+    font-variant-numeric: tabular-nums;
+    padding: 4px 0 2px;
+  }
+  .detail .big-stat .stat { display: flex; flex-direction: column; gap: 3px; }
+  .detail .big-stat .n {
+    font-size: 28px; font-weight: 600; line-height: 1;
+    color: var(--fg);
+  }
+  .detail .big-stat .u {
+    font-size: 13px; font-weight: 500;
+    color: var(--muted); margin-left: 2px;
+  }
+  .detail .big-stat .l {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+    font-family: var(--f-ui);
+  }
+  .detail .kv {
+    display: grid; grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    font-size: 14px;
+    margin: 0;
+  }
+  .detail .kv dt {
+    color: var(--muted); font-size: 12px;
+    padding-top: 2px; font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+  .detail .kv dd {
+    margin: 0;
+    font-family: var(--f-num);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    color: var(--fg);
+  }
+  .detail .memo-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--r-md);
+    padding: 14px;
+    font-size: 14px; line-height: 1.65;
+    white-space: pre-wrap;
+    color: var(--fg);
+  }
+
+  /* Tackle picker */
+  .tackle-picker { display: flex; gap: 8px; align-items: stretch; }
+  .tackle-picker select { flex: 1; min-width: 0; }
+  .tackle-picker .add-btn {
+    padding: 10px 12px; font-size: 12px; font-weight: 600;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--accent);
+    white-space: nowrap;
+    min-height: 44px;
+  }
+
+  /* Tackle view */
+  .tackle-tabs {
+    display: flex; gap: 6px; overflow-x: auto;
+    padding-block: 14px 6px; margin-bottom: 10px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .tackle-tabs::-webkit-scrollbar { display: none; }
+  .tackle-tab {
+    padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; white-space: nowrap;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--fg); cursor: pointer;
+    min-height: 34px;
+  }
+  .tackle-tab.active {
+    background: var(--accent); color: var(--accent-fg); border-color: var(--accent);
+    font-weight: 700;
+  }
+  .tackle-list { padding-bottom: 100px; }
+  .tackle-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 12px 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: start; gap: 10px;
+  }
+  .tackle-item .ti-name {
+    font-weight: 600; font-size: 15px;
+    font-family: var(--f-ui);
+  }
+  .tackle-item .ti-brand { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tackle-item .ti-spec {
+    font-size: 12px; color: var(--muted); margin-top: 2px;
+    font-family: var(--f-num);
+    font-variant-numeric: tabular-nums;
+  }
+  .tackle-item .ti-memo {
+    font-size: 12px; color: var(--faint); margin-top: 4px;
+    line-height: 1.4;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 100;
+    animation: fade .15s ease-out;
+  }
+  @keyframes fade { from { opacity: 0; } }
+  .modal {
+    background: var(--surface);
+    width: 100%; max-width: 500px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: 22px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+    max-height: 90vh; overflow-y: auto;
+    animation: slide .22s cubic-bezier(.2,.9,.3,1);
+  }
+  @keyframes slide { from { transform: translateY(100%); } }
+  .modal h3 {
+    font-family: var(--f-display);
+    margin: 0 0 16px 0; font-size: 18px; font-weight: 600;
+  }
+  .modal .actions {
+    display: flex; gap: 8px; margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .modal .actions > * { flex: 1; min-width: 90px; }
+  .modal p { margin: 0 0 14px 0; font-size: 15px; line-height: 1.5; }
+
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+    background: var(--fg); color: var(--bg);
+    padding: 10px 18px; border-radius: var(--r-md);
+    font-size: 13px; font-weight: 500; z-index: 200;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    animation: toastIn .18s ease-out;
+    max-width: 85vw;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: var(--r-md);
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .skel-list .skeleton { height: 108px; margin-bottom: 12px; }
+
+  /* Helpers */
+  .flex { display: flex; }
+  .gap-sm { gap: 8px; }
+  .items-center { align-items: center; }
+  .flex-1 { flex: 1; min-width: 0; }
+  .text-muted { color: var(--muted); }
+  .text-sm { font-size: 13px; }
+  .hidden { display: none; }
+
+  /* Section action bar at the end of edit form */
+  .form-actions {
+    display: flex; gap: 10px;
+    padding-top: 6px;
+  }
+  .form-actions > * { flex: 1; }
+
+  .inline-note {
+    font-size: 11px; color: var(--muted);
+    padding: 6px 2px 0;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============ LOG VIEW ============ -->
+  <div class="view active" id="view-log">
+    <header class="appbar">
+      <h1>釣果ログ<span class="count" id="log-count"></span></h1>
+      <div class="right">
+        <button class="btn-icon btn-ghost" id="tackle-btn" aria-label="タックル管理" title="タックル管理">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h10M4 12h7M4 17h4"/>
+            <circle cx="18" cy="7" r="2"/>
+            <circle cx="15" cy="12" r="2"/>
+            <circle cx="12" cy="17" r="2"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+    <div id="log-content">
+      <div class="skel-list" style="padding-top:14px">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </div>
+    </div>
+    <button class="fab" id="new-btn" aria-label="新しい釣果を記録">+</button>
+  </div>
+
+  <!-- ============ EDIT / NEW VIEW ============ -->
+  <div class="view" id="view-edit">
+    <header class="appbar">
+      <button class="btn-ghost btn-icon" id="edit-back" aria-label="戻る" style="font-size:22px">←</button>
+      <h1 id="edit-title">新規釣果</h1>
+      <button class="btn btn-primary" id="save-btn">保存</button>
+    </header>
+    <form class="form" id="catch-form" novalidate autocomplete="off">
+      <label class="photo-pick" id="photo-pick">
+        <div class="plus">+</div>
+        <div class="label">写真を選ぶ</div>
+        <div class="hint">EXIFから日時・場所を自動取得</div>
+        <input type="file" accept="image/*" id="photo-input">
+      </label>
+
+      <div class="section">
+        <h3>基本情報<span class="badge" id="auto-status"></span></h3>
+        <div class="field">
+          <label for="dt-input">日時</label>
+          <input type="datetime-local" id="dt-input">
+        </div>
+        <div class="field">
+          <label for="loc-input">場所 <span class="badge" id="loc-source"></span></label>
+          <input type="text" id="loc-input" placeholder="例: 由比ヶ浜">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="temp-input">気温 (℃)</label>
+            <input type="number" id="temp-input" step="0.1" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="weather-input">天候</label>
+            <select id="weather-input">
+              <option value="">—</option>
+              <option value="clear">☀ 快晴</option>
+              <option value="mostly-clear">🌤 晴れ</option>
+              <option value="partly-cloudy">⛅ 晴れ時々曇り</option>
+              <option value="cloudy">☁ 曇り</option>
+              <option value="fog">🌫 霧</option>
+              <option value="drizzle">🌦 霧雨</option>
+              <option value="rain">🌧 雨</option>
+              <option value="shower">🌦 にわか雨</option>
+              <option value="snow">🌨 雪</option>
+              <option value="thunder">⛈ 雷雨</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="wind-input">風 (m/s)</label>
+            <input type="number" id="wind-input" step="0.1" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="winddir-input">風向</label>
+            <select id="winddir-input">
+              <option value="">—</option>
+              <option>北</option><option>北東</option><option>東</option><option>南東</option>
+              <option>南</option><option>南西</option><option>西</option><option>北西</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="tide-input">潮位 (m)</label>
+            <input type="number" id="tide-input" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="tidedir-input">潮の動き</label>
+            <select id="tidedir-input">
+              <option value="">—</option>
+              <option value="rising">上げ潮</option>
+              <option value="high">満潮前後</option>
+              <option value="falling">下げ潮</option>
+              <option value="low">干潮前後</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>魚</h3>
+        <div class="field">
+          <label for="species-input">魚種</label>
+          <input type="text" id="species-input" list="species-list" placeholder="例: アジ">
+          <datalist id="species-list"></datalist>
+        </div>
+        <div class="row-3">
+          <div class="field">
+            <label for="length-input">長さ (cm)</label>
+            <input type="number" id="length-input" step="0.1" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="weight-input">重さ (g)</label>
+            <input type="number" id="weight-input" step="1" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="count-input">数</label>
+            <input type="number" id="count-input" value="1" min="1" step="1" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>タックル</h3>
+        <div class="field">
+          <label>ロッド</label>
+          <div class="tackle-picker">
+            <select id="rod-select"></select>
+            <button type="button" class="add-btn" data-add="rod">＋追加</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>リール</label>
+          <div class="tackle-picker">
+            <select id="reel-select"></select>
+            <button type="button" class="add-btn" data-add="reel">＋追加</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>ライン</label>
+          <div class="tackle-picker">
+            <select id="line-select"></select>
+            <button type="button" class="add-btn" data-add="line">＋追加</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>ルアー / 仕掛け</label>
+          <div class="tackle-picker">
+            <select id="lure-select"></select>
+            <button type="button" class="add-btn" data-add="lure">＋追加</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>コンディション・メモ</h3>
+        <div class="field">
+          <label for="memo-input">自由記述</label>
+          <textarea id="memo-input" placeholder="状況、ヒットパターン、感想など"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-danger" id="delete-btn" hidden>削除</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ DETAIL VIEW ============ -->
+  <div class="view" id="view-detail">
+    <header class="appbar">
+      <button class="btn-ghost btn-icon" data-back="true" aria-label="戻る" style="font-size:22px">←</button>
+      <h1 style="font-size:18px">詳細</h1>
+      <button class="btn" id="edit-current-btn">編集</button>
+    </header>
+    <div class="detail" id="detail-content"></div>
+  </div>
+
+  <!-- ============ TACKLE VIEW ============ -->
+  <div class="view" id="view-tackle">
+    <header class="appbar">
+      <button class="btn-ghost btn-icon" data-back="true" aria-label="戻る" style="font-size:22px">←</button>
+      <h1 style="font-size:18px">タックル管理</h1>
+      <button class="btn btn-primary" id="tackle-add-btn">＋追加</button>
+    </header>
+    <div class="tackle-tabs" id="tackle-tabs"></div>
+    <div class="tackle-list" id="tackle-list"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exifr/7.1.3/full.umd.js"></script>
+<script>
+'use strict';
+
+// ============ STATE ============
+let db = null;
+let assets = null;
+let catches = [];
+let tackles = [];
+let catchesLoaded = false;
+let tacklesLoaded = false;
+let currentEditId = null;
+let currentDetailId = null;
+let currentTackleTab = 'rod';
+let formState = {}; // transient per-form state (pending file, lat/lng, etc.)
+
+// Weather code → kind mapping
+const WEATHER_CODES = {
+  0: 'clear',
+  1: 'mostly-clear', 2: 'partly-cloudy', 3: 'cloudy',
+  45: 'fog', 48: 'fog',
+  51: 'drizzle', 53: 'drizzle', 55: 'drizzle',
+  56: 'drizzle', 57: 'drizzle',
+  61: 'rain', 63: 'rain', 65: 'rain', 66: 'rain', 67: 'rain',
+  71: 'snow', 73: 'snow', 75: 'snow', 77: 'snow',
+  80: 'shower', 81: 'shower', 82: 'shower',
+  85: 'snow', 86: 'snow',
+  95: 'thunder', 96: 'thunder', 99: 'thunder'
+};
+const WEATHER_ICONS = {
+  'clear': '☀', 'mostly-clear': '🌤', 'partly-cloudy': '⛅', 'cloudy': '☁',
+  'fog': '🌫', 'drizzle': '🌦', 'rain': '🌧', 'shower': '🌦',
+  'snow': '🌨', 'thunder': '⛈'
+};
+const WEATHER_LABELS = {
+  'clear': '快晴', 'mostly-clear': '晴れ', 'partly-cloudy': '晴れ時々曇り', 'cloudy': '曇り',
+  'fog': '霧', 'drizzle': '霧雨', 'rain': '雨', 'shower': 'にわか雨',
+  'snow': '雪', 'thunder': '雷雨'
+};
+const TIDE_LABELS = {
+  rising: '上げ潮', falling: '下げ潮',
+  high: '満潮前後', low: '干潮前後'
+};
+const TACKLE_TYPES = [
+  { key: 'rod', label: 'ロッド' },
+  { key: 'reel', label: 'リール' },
+  { key: 'line', label: 'ライン' },
+  { key: 'lure', label: 'ルアー・仕掛け' },
+  { key: 'other', label: 'その他' }
+];
+const WIND_DIRS = { '北': 0, '北東': 45, '東': 90, '南東': 135, '南': 180, '南西': 225, '西': 270, '北西': 315 };
+
+// ============ UTIL ============
+const $ = (sel, ctx = document) => ctx.querySelector(sel);
+const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+const uuid = () => (crypto.randomUUID?.() ?? ('id-' + Math.random().toString(36).slice(2) + Date.now().toString(36)));
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]));
+}
+function escapeAttr(s) {
+  return String(s ?? '').replace(/["&]/g, m => ({ '&':'&amp;', '"':'&quot;' }[m]));
+}
+function toast(msg, ms = 2200) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  $('#toast-root').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function formatDateShort(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function toDatetimeLocal(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromDatetimeLocal(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d) ? null : d.toISOString();
+}
+function windDirFromDeg(deg) {
+  if (deg == null || isNaN(deg)) return '';
+  const dirs = ['北','北東','東','南東','南','南西','西','北西'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+function numOrNull(v) {
+  if (v === '' || v == null) return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+// ============ IMAGE COMPRESSION ============
+async function compressImage(file, maxEdge = 1920, quality = 0.86) {
+  try {
+    const bmp = await createImageBitmap(file);
+    const w = bmp.width, h = bmp.height;
+    let nw = w, nh = h;
+    if (Math.max(w, h) > maxEdge) {
+      const scale = maxEdge / Math.max(w, h);
+      nw = Math.round(w * scale);
+      nh = Math.round(h * scale);
+    }
+    const useOffscreen = typeof OffscreenCanvas !== 'undefined';
+    const canvas = useOffscreen ? new OffscreenCanvas(nw, nh) : (() => {
+      const c = document.createElement('canvas'); c.width = nw; c.height = nh; return c;
+    })();
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bmp, 0, 0, nw, nh);
+    bmp.close?.();
+    if (canvas.convertToBlob) return await canvas.convertToBlob({ type: 'image/jpeg', quality });
+    return await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+  } catch (e) {
+    console.warn('compressImage failed, using original', e);
+    return file;
+  }
+}
+
+// ============ EXIF ============
+async function parseExif(file) {
+  if (typeof exifr === 'undefined') return {};
+  try {
+    const data = await exifr.parse(file, { gps: true, exif: true, ifd0: true });
+    const dt = data?.DateTimeOriginal || data?.CreateDate || data?.ModifyDate;
+    return {
+      datetime: dt ? new Date(dt).toISOString() : null,
+      lat: typeof data?.latitude === 'number' ? data.latitude : null,
+      lng: typeof data?.longitude === 'number' ? data.longitude : null
+    };
+  } catch (e) {
+    console.warn('EXIF parse failed', e);
+    return {};
+  }
+}
+
+// ============ API: Open-Meteo weather ============
+async function fetchWeather(lat, lng, iso) {
+  const d = new Date(iso);
+  const date = d.toISOString().slice(0, 10);
+  const now = new Date();
+  const diffDays = (now - d) / 86400000;
+  let url;
+  if (diffDays >= 0 && diffDays <= 90) {
+    const past = Math.min(92, Math.max(2, Math.ceil(diffDays) + 2));
+    url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,windspeed_10m,winddirection_10m,weathercode,pressure_msl&past_days=${past}&forecast_days=1&timezone=auto`;
+  } else {
+    url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${date}&end_date=${date}&hourly=temperature_2m,windspeed_10m,winddirection_10m,weathercode,pressure_msl&timezone=auto`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('weather HTTP ' + res.status);
+  const data = await res.json();
+  const hours = data.hourly?.time || [];
+  if (!hours.length) throw new Error('no weather hours');
+  const target = d.getTime();
+  let bestIdx = 0, bestDiff = Infinity;
+  for (let i = 0; i < hours.length; i++) {
+    const diff = Math.abs(new Date(hours[i]).getTime() - target);
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+  }
+  return {
+    temp: data.hourly.temperature_2m?.[bestIdx],
+    windSpeed: data.hourly.windspeed_10m?.[bestIdx],
+    windDir: data.hourly.winddirection_10m?.[bestIdx],
+    weatherCode: data.hourly.weathercode?.[bestIdx],
+    pressure: data.hourly.pressure_msl?.[bestIdx]
+  };
+}
+
+// ============ API: Open-Meteo marine (tide) ============
+async function fetchTide(lat, lng, iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = (now - d) / 86400000;
+  const date = d.toISOString().slice(0, 10);
+  let url;
+  if (diffDays >= 0 && diffDays <= 90) {
+    const past = Math.min(92, Math.max(2, Math.ceil(diffDays) + 2));
+    url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}&hourly=sea_level_height_msl&past_days=${past}&forecast_days=1&timezone=auto`;
+  } else {
+    url = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}&start_date=${date}&end_date=${date}&hourly=sea_level_height_msl&timezone=auto`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('tide HTTP ' + res.status);
+  const data = await res.json();
+  const hours = data.hourly?.time || [];
+  if (!hours.length) throw new Error('no tide hours');
+  const target = d.getTime();
+  let bestIdx = 0, bestDiff = Infinity;
+  for (let i = 0; i < hours.length; i++) {
+    const diff = Math.abs(new Date(hours[i]).getTime() - target);
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+  }
+  const levels = data.hourly.sea_level_height_msl || [];
+  const current = levels[bestIdx];
+  const prev = levels[Math.max(0, bestIdx - 1)];
+  const next = levels[Math.min(levels.length - 1, bestIdx + 1)];
+  let trend = '';
+  if (prev != null && next != null && current != null) {
+    const slope = next - prev;
+    if (Math.abs(slope) < 0.04) {
+      trend = current > (prev + next) / 2 ? 'high' : 'low';
+    } else if (slope > 0) trend = 'rising';
+    else trend = 'falling';
+  }
+  return { level: current, trend };
+}
+
+// ============ API: Reverse geocode ============
+async function reverseGeocode(lat, lng) {
+  try {
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=ja`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('geocode HTTP ' + res.status);
+    const data = await res.json();
+    const parts = [
+      data.principalSubdivision,
+      data.city || data.locality,
+      data.localityInfo?.administrative?.find(a => a.order >= 6)?.name
+    ].filter(Boolean);
+    const seen = new Set();
+    const out = [];
+    for (const p of parts) if (p && !seen.has(p)) { seen.add(p); out.push(p); }
+    return out.join(' ') || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  } catch (e) {
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+}
+
+// ============ DB & ASSETS (IndexedDB, this browser only) ============
+// Mimics the small subset of the old db/assets API that the app uses:
+//   db.collection(name).orderBy(field, dir).onSnapshot(cb, errCb)
+//   db.doc('collection/id').set(obj) / .delete()
+//   assets.upload(blob) -> { id }, assets.delete(id)
+const IDB_NAME = 'choka-log';
+const IDB_VERSION = 1;
+const STORES = ['catches', 'tackle', 'photos'];
+const photoUrls = new Map(); // photo id -> object URL
+
+function openIdb() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) { reject(new Error('IndexedDB unavailable')); return; }
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const idb = req.result;
+      for (const name of STORES) {
+        if (!idb.objectStoreNames.contains(name)) idb.createObjectStore(name);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbReq(idb, store, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(store, mode);
+    const r = fn(tx.objectStore(store));
+    tx.oncomplete = () => resolve(r?.result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+function idbAll(idb, store) {
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(store, 'readonly');
+    const os = tx.objectStore(store);
+    const keysReq = os.getAllKeys();
+    const valsReq = os.getAll();
+    tx.oncomplete = () => resolve(keysReq.result.map((k, i) => [k, valsReq.result[i]]));
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function createLocalDb(idb) {
+  const listeners = {}; // collection -> [{field, dir, cb, errCb}]
+  async function emit(col) {
+    const ls = listeners[col] || [];
+    if (!ls.length) return;
+    let rows;
+    try { rows = await idbAll(idb, col); }
+    catch (e) { ls.forEach(l => l.errCb?.(e)); return; }
+    for (const l of ls) {
+      const sorted = rows.slice();
+      if (l.field) {
+        const sign = l.dir === 'desc' ? -1 : 1;
+        sorted.sort(([, a], [, b]) => {
+          const x = a?.[l.field], y = b?.[l.field];
+          if (x == null && y == null) return 0;
+          if (x == null) return 1;
+          if (y == null) return -1;
+          return (x < y ? -1 : x > y ? 1 : 0) * sign;
+        });
+      }
+      l.cb({ docs: sorted.map(([id, v]) => ({ id, data: () => v })) });
+    }
+  }
+  return {
+    collection(col) {
+      const q = { field: null, dir: 'asc' };
+      const api = {
+        orderBy(field, dir = 'asc') { q.field = field; q.dir = dir; return api; },
+        onSnapshot(cb, errCb) {
+          (listeners[col] ||= []).push({ ...q, cb, errCb });
+          emit(col);
+          return () => { listeners[col] = listeners[col].filter(l => l.cb !== cb); };
+        }
+      };
+      return api;
+    },
+    doc(path) {
+      const [col, id] = path.split('/');
+      return {
+        async set(obj) {
+          await idbReq(idb, col, 'readwrite', os => os.put(JSON.parse(JSON.stringify(obj)), id));
+          emit(col);
+        },
+        async delete() {
+          await idbReq(idb, col, 'readwrite', os => os.delete(id));
+          emit(col);
+        }
+      };
+    }
+  };
+}
+
+function createLocalAssets(idb) {
+  return {
+    async upload(blob) {
+      const id = uuid();
+      await idbReq(idb, 'photos', 'readwrite', os => os.put(blob, id));
+      photoUrls.set(id, URL.createObjectURL(blob));
+      return { id };
+    },
+    async delete(id) {
+      await idbReq(idb, 'photos', 'readwrite', os => os.delete(id));
+      const u = photoUrls.get(id);
+      if (u) { URL.revokeObjectURL(u); photoUrls.delete(id); }
+    }
+  };
+}
+
+async function loadAllPhotos(idb) {
+  const rows = await idbAll(idb, 'photos');
+  for (const [id, blob] of rows) {
+    if (blob instanceof Blob) photoUrls.set(id, URL.createObjectURL(blob));
+  }
+}
+
+function photoUrlFor(id) {
+  return id ? (photoUrls.get(id) || null) : null;
+}
+
+async function initCapabilities() {
+  try {
+    const idb = await openIdb();
+    await loadAllPhotos(idb);
+    db = createLocalDb(idb);
+    assets = createLocalAssets(idb);
+    // Ask the browser not to evict our data under storage pressure.
+    navigator.storage?.persist?.().catch(() => {});
+  } catch (e) {
+    console.warn('storage init failed', e);
+  }
+  if (!db) {
+    renderCapabilityError();
+    return;
+  }
+  subscribeData();
+}
+
+function renderCapabilityError() {
+  catchesLoaded = true;
+  $('#log-content').innerHTML = `
+    <div class="empty">
+      <h2>データを読み込めません</h2>
+      <p>ブラウザ内の保存領域を開けませんでした。プライベートモードを解除するか、サイトデータの保存を許可してから再読み込みしてください。</p>
+    </div>`;
+}
+
+function subscribeData() {
+  const timeout = setTimeout(() => {
+    if (!catchesLoaded) {
+      catchesLoaded = true;
+      renderLog();
+    }
+  }, 10000);
+
+  db.collection('catches').orderBy('timestamp', 'desc').onSnapshot(
+    snap => {
+      clearTimeout(timeout);
+      catches = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+      catchesLoaded = true;
+      renderLog();
+      updateCount();
+      refreshSpeciesList();
+      if (currentDetailId && isActiveView('detail')) renderDetail(currentDetailId);
+    },
+    err => console.warn('catches snapshot err', err)
+  );
+  db.collection('tackle').orderBy('name').onSnapshot(
+    snap => {
+      tackles = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+      tacklesLoaded = true;
+      refreshTackleSelects();
+      if (isActiveView('tackle')) renderTackleList();
+    },
+    err => console.warn('tackle snapshot err', err)
+  );
+}
+
+async function saveCatch(data) {
+  const id = currentEditId || uuid();
+  const existing = catches.find(c => c._id === id);
+  const doc = {
+    ...data,
+    id,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  await db.doc('catches/' + id).set(doc);
+  return id;
+}
+async function removeCatch(id) {
+  const c = catches.find(c => c._id === id);
+  if (c?.photoAssetId && assets) {
+    try { await assets.delete(c.photoAssetId); } catch (e) { /* non-fatal */ }
+  }
+  await db.doc('catches/' + id).delete();
+}
+async function saveTackleDoc(data) {
+  const id = data.id || uuid();
+  const doc = { ...data, id, updatedAt: new Date().toISOString() };
+  await db.doc('tackle/' + id).set(doc);
+  return id;
+}
+async function removeTackleDoc(id) {
+  await db.doc('tackle/' + id).delete();
+}
+
+// ============ ROUTING ============
+const VIEWS = ['log', 'edit', 'detail', 'tackle'];
+function isActiveView(name) {
+  return $('#view-' + name)?.classList.contains('active') ?? false;
+}
+function showView(name) {
+  $$('.view').forEach(v => v.classList.remove('active'));
+  $('#view-' + name)?.classList.add('active');
+  window.scrollTo(0, 0);
+}
+function navigate(hash) {
+  if (location.hash === '#' + hash || (hash === '' && location.hash === '')) {
+    handleRoute();
+  } else {
+    location.hash = hash ? '#' + hash : '';
+  }
+}
+function handleRoute() {
+  const h = location.hash.replace(/^#/, '');
+  switch (h) {
+    case '':
+    case 'log':
+      showView('log');
+      break;
+    case 'new':
+      currentEditId = null;
+      initNewCatchForm();
+      showView('edit');
+      break;
+    case 'edit':
+      if (!currentEditId) { navigate('log'); return; }
+      initEditCatchForm(currentEditId);
+      showView('edit');
+      break;
+    case 'detail':
+      if (!currentDetailId) { navigate('log'); return; }
+      renderDetail(currentDetailId);
+      showView('detail');
+      break;
+    case 'tackle':
+      renderTackleList();
+      showView('tackle');
+      break;
+    default:
+      navigate('log');
+  }
+}
+
+// ============ RENDER: LOG ============
+function updateCount() {
+  const el = $('#log-count');
+  if (!el) return;
+  if (!catches.length) { el.textContent = ''; return; }
+  const total = catches.reduce((s, c) => s + (c.fish?.count || 1), 0);
+  el.textContent = `${catches.length}件 / ${total}匹`;
+}
+
+function renderLog() {
+  const root = $('#log-content');
+  if (!catchesLoaded) {
+    root.innerHTML = `
+      <div class="skel-list" style="padding-top:14px">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </div>`;
+    return;
+  }
+  if (!catches.length) {
+    root.innerHTML = `
+      <div class="empty">
+        <h2>まだ記録がありません</h2>
+        <p>右下の＋ボタンから最初の釣果を記録しましょう。写真を選ぶと日時・場所・天候・潮位を自動で埋めます。</p>
+        <button class="btn btn-primary" id="empty-new-btn">最初の釣果を記録</button>
+      </div>`;
+    $('#empty-new-btn').addEventListener('click', () => navigate('new'));
+    return;
+  }
+  root.innerHTML = '<div class="list">' + catches.map(renderCard).join('') + '</div>';
+  $$('.card[data-id]', root).forEach(el => {
+    el.addEventListener('click', () => {
+      currentDetailId = el.dataset.id;
+      navigate('detail');
+    });
+  });
+}
+
+function renderCard(c) {
+  const photoUrl = photoUrlFor(c.photoAssetId);
+  const species = c.fish?.species || '（魚種未入力）';
+  const length = c.fish?.length != null ? c.fish.length + ' cm' : '';
+  const weight = c.fish?.weight != null ? c.fish.weight + ' g' : '';
+  const count = c.fish?.count && c.fish.count > 1 ? '×' + c.fish.count : '';
+  const stats = [length, weight, count].filter(Boolean).join(' · ');
+  const place = c.locationName || (c.lat != null ? `${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}` : '');
+  const dt = formatDateShort(c.timestamp);
+  const wKind = c.weather?.weatherCode != null ? WEATHER_CODES[c.weather.weatherCode] : null;
+  const wIcon = wKind ? WEATHER_ICONS[wKind] : '';
+  const temp = c.weather?.temp != null ? Math.round(c.weather.temp) + '℃' : '';
+  const tide = c.tide?.level != null ? '潮 ' + c.tide.level.toFixed(2) + 'm' : '';
+  const metaParts = [
+    dt,
+    [wIcon, temp].filter(Boolean).join(' '),
+    tide
+  ].filter(Boolean);
+
+  return `
+    <div class="card" data-id="${escapeAttr(c._id)}">
+      ${photoUrl
+        ? `<div class="thumb" style="background-image:url('${escapeAttr(photoUrl)}')"></div>`
+        : `<div class="thumb no-photo">魚</div>`}
+      <div class="body">
+        <div class="species">${escapeHtml(species)}</div>
+        ${stats ? `<div class="stats">${escapeHtml(stats)}</div>` : ''}
+        ${place ? `<div class="place">${escapeHtml(place)}</div>` : ''}
+        <div class="meta">
+          ${metaParts.map((m, i) => (i > 0 ? '<span class="dot">·</span>' : '') + `<span>${escapeHtml(m)}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+function refreshSpeciesList() {
+  const list = $('#species-list');
+  if (!list) return;
+  const uniq = [...new Set(catches.map(c => c.fish?.species).filter(Boolean))];
+  list.innerHTML = uniq.map(s => `<option value="${escapeAttr(s)}"></option>`).join('');
+}
+
+// ============ FORM: NEW/EDIT ============
+function initNewCatchForm() {
+  currentEditId = null;
+  $('#edit-title').textContent = '新規釣果';
+  $('#delete-btn').hidden = true;
+  resetForm();
+}
+
+function initEditCatchForm(id) {
+  const c = catches.find(c => c._id === id);
+  if (!c) {
+    toast('データが見つかりません');
+    navigate('log');
+    return;
+  }
+  $('#edit-title').textContent = '編集';
+  $('#delete-btn').hidden = false;
+  fillForm(c);
+}
+
+function resetForm() {
+  formState = {};
+  const now = new Date().toISOString();
+  $('#dt-input').value = toDatetimeLocal(now);
+  $('#loc-input').value = '';
+  $('#loc-source').textContent = '';
+  $('#loc-source').className = 'badge';
+  $('#temp-input').value = '';
+  $('#weather-input').value = '';
+  $('#wind-input').value = '';
+  $('#winddir-input').value = '';
+  $('#tide-input').value = '';
+  $('#tidedir-input').value = '';
+  $('#species-input').value = '';
+  $('#length-input').value = '';
+  $('#weight-input').value = '';
+  $('#count-input').value = '1';
+  $('#memo-input').value = '';
+  $('#rod-select').value = '';
+  $('#reel-select').value = '';
+  $('#line-select').value = '';
+  $('#lure-select').value = '';
+  renderPhotoPicker(null);
+  $('#auto-status').textContent = '';
+  $('#auto-status').className = 'badge';
+}
+
+function fillForm(c) {
+  formState = {
+    photoAssetId: c.photoAssetId || null,
+    lat: c.lat ?? null,
+    lng: c.lng ?? null,
+    locSource: c.locSource || null,
+    pressure: c.weather?.pressure ?? null,
+    pendingFile: null
+  };
+  $('#dt-input').value = toDatetimeLocal(c.timestamp);
+  $('#loc-input').value = c.locationName || '';
+  if (c.locSource === 'exif') {
+    $('#loc-source').textContent = 'GPS';
+    $('#loc-source').className = 'badge ok';
+  } else {
+    $('#loc-source').textContent = '';
+    $('#loc-source').className = 'badge';
+  }
+  $('#temp-input').value = c.weather?.temp != null ? Number(c.weather.temp).toFixed(1) : '';
+  $('#weather-input').value = c.weather?.weatherCode != null ? (WEATHER_CODES[c.weather.weatherCode] || '') : '';
+  $('#wind-input').value = c.weather?.windSpeed != null ? Number(c.weather.windSpeed).toFixed(1) : '';
+  $('#winddir-input').value = c.weather?.windDir != null ? windDirFromDeg(c.weather.windDir) : '';
+  $('#tide-input').value = c.tide?.level != null ? Number(c.tide.level).toFixed(2) : '';
+  $('#tidedir-input').value = c.tide?.trend || '';
+  $('#species-input').value = c.fish?.species || '';
+  $('#length-input').value = c.fish?.length ?? '';
+  $('#weight-input').value = c.fish?.weight ?? '';
+  $('#count-input').value = c.fish?.count ?? 1;
+  $('#memo-input').value = c.memo || '';
+  $('#rod-select').value = c.tackle?.rodId || '';
+  $('#reel-select').value = c.tackle?.reelId || '';
+  $('#line-select').value = c.tackle?.lineId || '';
+  $('#lure-select').value = c.tackle?.lureId || '';
+  renderPhotoPicker(photoUrlFor(c.photoAssetId));
+  $('#auto-status').textContent = '';
+  $('#auto-status').className = 'badge';
+}
+
+function renderPhotoPicker(url) {
+  const picker = $('#photo-pick');
+  if (url) {
+    picker.classList.add('has-image');
+    picker.style.backgroundImage = `url('${url}')`;
+    picker.innerHTML = `<div class="change-hint">タップで変更</div><input type="file" accept="image/*" id="photo-input">`;
+  } else {
+    picker.classList.remove('has-image');
+    picker.style.backgroundImage = '';
+    picker.innerHTML = `
+      <div class="plus">+</div>
+      <div class="label">写真を選ぶ</div>
+      <div class="hint">EXIFから日時・場所を自動取得</div>
+      <input type="file" accept="image/*" id="photo-input">`;
+  }
+  bindPhotoInput();
+}
+
+function bindPhotoInput() {
+  const input = $('#photo-input');
+  if (input) input.addEventListener('change', handlePhotoChange);
+}
+
+async function handlePhotoChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const status = $('#auto-status');
+
+  const previewUrl = URL.createObjectURL(file);
+  renderPhotoPicker(previewUrl);
+  formState.pendingFile = file;
+
+  status.textContent = '解析中…';
+  status.className = 'badge loading';
+
+  const exif = await parseExif(file);
+  if (exif.datetime) $('#dt-input').value = toDatetimeLocal(exif.datetime);
+
+  if (exif.lat != null && exif.lng != null) {
+    formState.lat = exif.lat;
+    formState.lng = exif.lng;
+    formState.locSource = 'exif';
+    $('#loc-source').textContent = 'GPS';
+    $('#loc-source').className = 'badge ok';
+
+    const iso = exif.datetime || new Date().toISOString();
+    const [placeR, weatherR, tideR] = await Promise.allSettled([
+      reverseGeocode(exif.lat, exif.lng),
+      fetchWeather(exif.lat, exif.lng, iso),
+      fetchTide(exif.lat, exif.lng, iso)
+    ]);
+    if (placeR.status === 'fulfilled' && !$('#loc-input').value) {
+      $('#loc-input').value = placeR.value;
+    }
+    if (weatherR.status === 'fulfilled') {
+      const w = weatherR.value;
+      if (w.temp != null) $('#temp-input').value = Number(w.temp).toFixed(1);
+      if (w.windSpeed != null) $('#wind-input').value = Number(w.windSpeed).toFixed(1);
+      if (w.windDir != null) $('#winddir-input').value = windDirFromDeg(w.windDir);
+      formState.pressure = w.pressure ?? null;
+      if (w.weatherCode != null && WEATHER_CODES[w.weatherCode]) {
+        $('#weather-input').value = WEATHER_CODES[w.weatherCode];
+      }
+    }
+    if (tideR.status === 'fulfilled') {
+      const t = tideR.value;
+      if (t.level != null) $('#tide-input').value = Number(t.level).toFixed(2);
+      if (t.trend) $('#tidedir-input').value = t.trend;
+    }
+    const okCount = [weatherR, tideR].filter(r => r.status === 'fulfilled').length;
+    if (okCount === 2) { status.textContent = '取得完了'; status.className = 'badge ok'; }
+    else if (okCount === 1) { status.textContent = '一部のみ取得'; status.className = 'badge warn'; }
+    else { status.textContent = '取得失敗'; status.className = 'badge warn'; }
+  } else {
+    status.textContent = 'GPSなし — 手入力してください';
+    status.className = 'badge warn';
+  }
+}
+
+async function collectFormData() {
+  const timestamp = fromDatetimeLocal($('#dt-input').value);
+  const weatherKey = $('#weather-input').value;
+  let weatherCode = null;
+  if (weatherKey) {
+    const found = Object.entries(WEATHER_CODES).find(([, v]) => v === weatherKey);
+    if (found) weatherCode = parseInt(found[0], 10);
+  }
+  const data = {
+    timestamp,
+    photoAssetId: formState.photoAssetId || null,
+    lat: formState.lat ?? null,
+    lng: formState.lng ?? null,
+    locSource: formState.locSource || null,
+    locationName: $('#loc-input').value.trim() || null,
+    weather: {
+      temp: numOrNull($('#temp-input').value),
+      windSpeed: numOrNull($('#wind-input').value),
+      windDir: WIND_DIRS[$('#winddir-input').value] ?? null,
+      weatherCode,
+      pressure: formState.pressure ?? null
+    },
+    tide: {
+      level: numOrNull($('#tide-input').value),
+      trend: $('#tidedir-input').value || null
+    },
+    fish: {
+      species: $('#species-input').value.trim() || null,
+      length: numOrNull($('#length-input').value),
+      weight: numOrNull($('#weight-input').value),
+      count: Math.max(1, parseInt($('#count-input').value || '1', 10))
+    },
+    tackle: {
+      rodId: $('#rod-select').value || null,
+      reelId: $('#reel-select').value || null,
+      lineId: $('#line-select').value || null,
+      lureId: $('#lure-select').value || null
+    },
+    memo: $('#memo-input').value.trim() || null
+  };
+
+  if (formState.pendingFile && assets) {
+    try {
+      const blob = await compressImage(formState.pendingFile);
+      const up = await assets.upload(blob);
+      data.photoAssetId = up.id;
+      if (currentEditId) {
+        const old = catches.find(c => c._id === currentEditId);
+        if (old?.photoAssetId && old.photoAssetId !== up.id) {
+          try { await assets.delete(old.photoAssetId); } catch (e) { /* non-fatal */ }
+        }
+      }
+      formState.pendingFile = null;
+    } catch (e) {
+      console.warn('upload failed', e);
+      toast('写真の保存に失敗しました');
+    }
+  }
+  return data;
+}
+
+async function handleSave() {
+  const btn = $('#save-btn');
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const data = await collectFormData();
+    const id = await saveCatch(data);
+    toast('保存しました');
+    currentDetailId = id;
+    history.replaceState(null, '', '#detail');
+    handleRoute();
+  } catch (e) {
+    console.error(e);
+    toast('保存に失敗しました');
+  } finally {
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+async function handleDelete() {
+  if (!currentEditId) return;
+  const ok = await confirmDialog('この釣果を削除しますか？元に戻せません。', true);
+  if (!ok) return;
+  try {
+    await removeCatch(currentEditId);
+    toast('削除しました');
+    currentEditId = null;
+    currentDetailId = null;
+    navigate('log');
+  } catch (e) {
+    console.error(e);
+    toast('削除に失敗しました');
+  }
+}
+
+// ============ RENDER: DETAIL ============
+function renderDetail(id) {
+  const c = catches.find(c => c._id === id);
+  const root = $('#detail-content');
+  if (!c) {
+    root.innerHTML = '<div class="empty"><p>データが見つかりません</p></div>';
+    return;
+  }
+  const photoUrl = photoUrlFor(c.photoAssetId);
+  const species = c.fish?.species || '（魚種未入力）';
+  const dt = formatDate(c.timestamp);
+
+  const rod = c.tackle?.rodId ? tackles.find(t => t._id === c.tackle.rodId) : null;
+  const reel = c.tackle?.reelId ? tackles.find(t => t._id === c.tackle.reelId) : null;
+  const line = c.tackle?.lineId ? tackles.find(t => t._id === c.tackle.lineId) : null;
+  const lure = c.tackle?.lureId ? tackles.find(t => t._id === c.tackle.lureId) : null;
+
+  const wKind = c.weather?.weatherCode != null ? WEATHER_CODES[c.weather.weatherCode] : null;
+  const wIcon = wKind ? WEATHER_ICONS[wKind] : '';
+  const wLabel = wKind ? WEATHER_LABELS[wKind] : '';
+  const tideLabel = c.tide?.trend ? TIDE_LABELS[c.tide.trend] : '';
+  const windLabel = c.weather?.windDir != null ? windDirFromDeg(c.weather.windDir) : '';
+
+  const hasBigStats = c.fish?.length != null || c.fish?.weight != null || (c.fish?.count ?? 1) > 1;
+
+  const kvRows = [];
+  if (c.locationName) kvRows.push(['場所', escapeHtml(c.locationName)]);
+  if (c.lat != null && c.lng != null) kvRows.push(['座標', `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`]);
+  if (wLabel) kvRows.push(['天候', `${wIcon} ${escapeHtml(wLabel)}`]);
+  if (c.weather?.temp != null) kvRows.push(['気温', `${Number(c.weather.temp).toFixed(1)} ℃`]);
+  if (c.weather?.windSpeed != null) kvRows.push(['風', `${Number(c.weather.windSpeed).toFixed(1)} m/s ${windLabel}`]);
+  if (c.weather?.pressure != null) kvRows.push(['気圧', `${Math.round(c.weather.pressure)} hPa`]);
+  if (c.tide?.level != null) kvRows.push(['潮位', `${Number(c.tide.level).toFixed(2)} m ${escapeHtml(tideLabel)}`]);
+
+  const tackleRows = [];
+  if (rod) tackleRows.push(['ロッド', formatTackleCell(rod)]);
+  if (reel) tackleRows.push(['リール', formatTackleCell(reel)]);
+  if (line) tackleRows.push(['ライン', formatTackleCell(line)]);
+  if (lure) tackleRows.push(['ルアー', formatTackleCell(lure)]);
+
+  root.innerHTML = `
+    ${photoUrl
+      ? `<div class="photo" style="background-image:url('${escapeAttr(photoUrl)}')"></div>`
+      : `<div class="photo no-photo">魚</div>`}
+    <div>
+      <h2>${escapeHtml(species)}</h2>
+      <div class="date-line">${escapeHtml(dt)}</div>
+    </div>
+    ${hasBigStats ? `
+    <div class="big-stat">
+      ${c.fish?.length != null ? `<div class="stat"><div class="n">${c.fish.length}<span class="u">cm</span></div><div class="l">長さ</div></div>` : ''}
+      ${c.fish?.weight != null ? `<div class="stat"><div class="n">${c.fish.weight}<span class="u">g</span></div><div class="l">重さ</div></div>` : ''}
+      ${(c.fish?.count ?? 1) > 1 ? `<div class="stat"><div class="n">${c.fish.count}<span class="u">匹</span></div><div class="l">数</div></div>` : ''}
+    </div>` : ''}
+    ${kvRows.length ? `<dl class="kv">${kvRows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
+    ${tackleRows.length ? `
+    <div>
+      <div class="text-muted text-sm" style="margin-bottom:8px;font-weight:500">タックル</div>
+      <dl class="kv">${tackleRows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd style="font-family:var(--f-ui)">${v}</dd>`).join('')}</dl>
+    </div>` : ''}
+    ${c.memo ? `
+    <div>
+      <div class="text-muted text-sm" style="margin-bottom:8px;font-weight:500">メモ</div>
+      <div class="memo-box">${escapeHtml(c.memo)}</div>
+    </div>` : ''}
+  `;
+}
+
+function formatTackleCell(t) {
+  const name = escapeHtml(t.name || '');
+  const brand = t.brand ? ` <span class="text-muted" style="font-size:12px">[${escapeHtml(t.brand)}]</span>` : '';
+  const spec = t.spec ? `<div class="text-muted" style="font-size:12px;font-family:var(--f-num);margin-top:2px">${escapeHtml(t.spec)}</div>` : '';
+  return name + brand + spec;
+}
+
+// ============ TACKLE MASTER ============
+function refreshTackleSelects() {
+  const map = { rod: 'rod-select', reel: 'reel-select', line: 'line-select', lure: 'lure-select' };
+  for (const [type, selId] of Object.entries(map)) {
+    const sel = $('#' + selId);
+    if (!sel) continue;
+    const current = sel.value;
+    const list = tackles.filter(t => t.type === type);
+    sel.innerHTML = '<option value="">—</option>' + list.map(t =>
+      `<option value="${escapeAttr(t._id)}">${escapeHtml(tackleLabel(t))}</option>`
+    ).join('');
+    if (current && list.some(t => t._id === current)) sel.value = current;
+  }
+}
+function tackleLabel(t) {
+  const parts = [t.name];
+  if (t.brand) parts.push(`[${t.brand}]`);
+  if (t.spec) parts.push(t.spec);
+  return parts.filter(Boolean).join(' ');
+}
+
+function renderTackleList() {
+  const tabsEl = $('#tackle-tabs');
+  tabsEl.innerHTML = TACKLE_TYPES.map(t =>
+    `<button class="tackle-tab${t.key === currentTackleTab ? ' active' : ''}" data-type="${t.key}">${t.label}</button>`
+  ).join('');
+  tabsEl.onclick = e => {
+    const btn = e.target.closest('.tackle-tab');
+    if (!btn) return;
+    currentTackleTab = btn.dataset.type;
+    renderTackleList();
+  };
+  const list = $('#tackle-list');
+  const items = tackles.filter(t => t.type === currentTackleTab);
+  if (!items.length) {
+    const label = TACKLE_TYPES.find(x => x.key === currentTackleTab).label;
+    list.innerHTML = `<div class="empty"><p>${escapeHtml(label)}は未登録です。右上の＋から追加できます。</p></div>`;
+    return;
+  }
+  list.innerHTML = items.map(t => `
+    <div class="tackle-item">
+      <div class="flex-1">
+        <div class="ti-name">${escapeHtml(t.name)}</div>
+        ${t.brand ? `<div class="ti-brand">${escapeHtml(t.brand)}</div>` : ''}
+        ${t.spec ? `<div class="ti-spec">${escapeHtml(t.spec)}</div>` : ''}
+        ${t.memo ? `<div class="ti-memo">${escapeHtml(t.memo)}</div>` : ''}
+      </div>
+      <button class="btn" data-edit="${escapeAttr(t._id)}">編集</button>
+    </div>`).join('');
+  list.querySelectorAll('[data-edit]').forEach(b =>
+    b.addEventListener('click', () => openTackleModal(b.dataset.edit))
+  );
+}
+
+function openTackleModal(editId = null, prefillType = null) {
+  return new Promise(resolve => {
+    const t = editId ? tackles.find(x => x._id === editId) : null;
+    const type = t?.type || prefillType || currentTackleTab;
+    const typeLabel = TACKLE_TYPES.find(x => x.key === type)?.label || '';
+    const html = `
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true">
+          <h3>${t ? '編集' : '追加'}: ${escapeHtml(typeLabel)}</h3>
+          <div class="field">
+            <label>種類</label>
+            <select id="m-type">
+              ${TACKLE_TYPES.map(x =>
+                `<option value="${x.key}"${x.key === type ? ' selected' : ''}>${x.label}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>名称 <span style="color:var(--warn)">*</span></label>
+            <input type="text" id="m-name" value="${escapeAttr(t?.name || '')}" placeholder="例: ○○ロッド 86ML" autofocus>
+          </div>
+          <div class="field">
+            <label>ブランド</label>
+            <input type="text" id="m-brand" value="${escapeAttr(t?.brand || '')}" placeholder="例: シマノ">
+          </div>
+          <div class="field">
+            <label>スペック・番手</label>
+            <input type="text" id="m-spec" value="${escapeAttr(t?.spec || '')}" placeholder="例: 2500番, PE 0.6号">
+          </div>
+          <div class="field">
+            <label>メモ</label>
+            <textarea id="m-memo" rows="2" placeholder="任意">${escapeHtml(t?.memo || '')}</textarea>
+          </div>
+          <div class="actions">
+            ${t ? `<button class="btn btn-danger" id="m-delete">削除</button>` : ''}
+            <button class="btn" id="m-cancel">キャンセル</button>
+            <button class="btn btn-primary" id="m-save">保存</button>
+          </div>
+        </div>
+      </div>`;
+    const root = $('#modal-root');
+    root.innerHTML = html;
+    const close = (val) => { root.innerHTML = ''; resolve(val); };
+    root.querySelector('.modal-backdrop').addEventListener('click', e => {
+      if (e.target.classList.contains('modal-backdrop')) close(null);
+    });
+    $('#m-cancel').addEventListener('click', () => close(null));
+    $('#m-save').addEventListener('click', async () => {
+      const name = $('#m-name').value.trim();
+      if (!name) { toast('名称を入力してください'); return; }
+      const data = {
+        id: t?.id,
+        type: $('#m-type').value,
+        name,
+        brand: $('#m-brand').value.trim() || null,
+        spec: $('#m-spec').value.trim() || null,
+        memo: $('#m-memo').value.trim() || null
+      };
+      try {
+        const id = await saveTackleDoc(data);
+        toast(t ? '更新しました' : '追加しました');
+        close(id);
+      } catch (e) {
+        console.error(e);
+        toast('保存に失敗しました');
+      }
+    });
+    const delBtn = $('#m-delete');
+    if (delBtn) {
+      delBtn.addEventListener('click', async () => {
+        const ok = await confirmDialog('この用品を削除しますか？過去の釣果記録はそのまま残ります。', true);
+        if (!ok) return;
+        try {
+          await removeTackleDoc(t.id);
+          toast('削除しました');
+          close(null);
+        } catch (e) {
+          console.error(e);
+          toast('削除に失敗しました');
+        }
+      });
+    }
+  });
+}
+
+// ============ CUSTOM CONFIRM ============
+function confirmDialog(msg, danger = false) {
+  return new Promise(resolve => {
+    const html = `
+      <div class="modal-backdrop">
+        <div class="modal" role="alertdialog" aria-modal="true">
+          <p>${escapeHtml(msg)}</p>
+          <div class="actions">
+            <button class="btn" id="c-no">キャンセル</button>
+            <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" id="c-yes">${danger ? '削除' : 'OK'}</button>
+          </div>
+        </div>
+      </div>`;
+    const root = $('#modal-root');
+    root.innerHTML = html;
+    const close = (v) => { root.innerHTML = ''; resolve(v); };
+    $('#c-no').addEventListener('click', () => close(false));
+    $('#c-yes').addEventListener('click', () => close(true));
+    root.querySelector('.modal-backdrop').addEventListener('click', e => {
+      if (e.target.classList.contains('modal-backdrop')) close(false);
+    });
+  });
+}
+
+// ============ EVENTS ============
+function bindEvents() {
+  $('#new-btn').addEventListener('click', () => navigate('new'));
+  $('#tackle-btn').addEventListener('click', () => navigate('tackle'));
+
+  $('#edit-back').addEventListener('click', () => history.back());
+  $$('[data-back="true"]').forEach(el =>
+    el.addEventListener('click', () => history.back())
+  );
+
+  $('#save-btn').addEventListener('click', handleSave);
+  $('#delete-btn').addEventListener('click', handleDelete);
+  $('#edit-current-btn').addEventListener('click', () => {
+    if (currentDetailId) {
+      currentEditId = currentDetailId;
+      navigate('edit');
+    }
+  });
+
+  $('#tackle-add-btn').addEventListener('click', () => openTackleModal(null, currentTackleTab));
+
+  $$('.add-btn[data-add]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const type = b.dataset.add;
+      const newId = await openTackleModal(null, type);
+      if (newId) {
+        refreshTackleSelects();
+        const sel = $('#' + type + '-select');
+        if (sel) sel.value = newId;
+      }
+    });
+  });
+
+  bindPhotoInput();
+  window.addEventListener('hashchange', handleRoute);
+}
+
+// ============ STARTUP ============
+(async function init() {
+  bindEvents();
+  renderLog();
+  handleRoute();
+  await initCapabilities();
+})();
+</script>
+</body>
+</html>
